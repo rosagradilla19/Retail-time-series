@@ -1,0 +1,350 @@
+---
+title: "Final Project Dynamic Regression"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Loading and Preparation
+
+```{r include=FALSE}
+# loading libraries
+library(dplyr)
+library(fpp2)
+library(forecast)
+library(tseries)
+library(kader)
+```
+
+```{r}
+# loading dataset
+df <- read.csv('retail_sales.csv')
+```
+
+We need to get rid of 2020 since it is an outlier and would mess with our model since it is so different from other years.
+```{r}
+tail(df)
+```
+
+We need to get rid of 2020 since it is an outlier and would mess with our model since it is so different from other years.
+```{r}
+df <- df %>% filter(row_number() <= n()-8)
+```
+
+```{r}
+tail(df)
+```
+
+
+```{r}
+df <- df %>% select(alcohol_sales, sporting_goods_sales, clothing_sales, furniture_sales, restaurants_sales)
+head(df)
+```
+# Clothing
+```{r}
+clothing <- ts(df$clothing_sales, frequency = 12, start = c(1992,01), end = c(2019,12))
+autoplot(clothing)
+```
+```{r}
+clothing_stl <- stl(clothing, s.window=12)
+autoplot(clothing_stl) + 
+  xlab("Year") + 
+  ggtitle("Monthly Clothing Sales Decomposition")
+```
+
+# Sporting Goods
+```{r}
+sporting_goods <- ts(df$sporting_goods_sales, frequency = 12, start = c(1992,01), end = c(2019,12))
+autoplot(sporting_goods)
+```
+```{r}
+sporting_goods_stl <- stl(sporting_goods, s.window=12)
+autoplot(sporting_goods_stl) + 
+  xlab("Year") + 
+  ggtitle("Monthly Sporting Goods Sales Decomposition")
+```
+
+# Furniture 
+```{r}
+furniture <- ts(df$furniture_sales, frequency = 12, start = c(1992,01), end = c(2019,12))
+autoplot(furniture)
+```
+```{r}
+furniture_stl <- stl(furniture, s.window=12)
+autoplot(furniture_stl) + 
+  xlab("Year") + 
+  ggtitle("Monthly Furniture Sales Decomposition")
+```
+
+# Restaurants
+```{r}
+restaurant <- ts(df$restaurants_sales, frequency = 12, start = c(1992,01), end = c(2019,12))
+autoplot(restaurant)
+```
+```{r}
+restaurant_stl <- stl(restaurant, s.window=12)
+autoplot(restaurant_stl) + 
+  xlab("Year") + 
+  ggtitle("Monthly Restaurants Sales Decomposition")
+```
+
+# Alcohol Sales
+```{r}
+alcohol <- ts(df$alcohol_sales, frequency = 12, start = c(1992,01), end = c(2019,12))
+autoplot(alcohol)
+```
+```{r}
+alcohol_stl <- stl(alcohol, s.window=12)
+autoplot(alcohol_stl) + 
+  xlab("Year") + 
+  ggtitle("Monthly Alcohol Sales Decomposition")
+```
+
+# Variance Stabilizing and Sesonally adjusting
+```{r}
+lambda.opt <- BoxCox.lambda(clothing)
+stable_clothing <- BoxCox(clothing, lambda=lambda.opt)
+autoplot(stable_clothing)
+lambda.opt
+```
+```{r}
+stable_clothing_stl <- stl(stable_clothing, s.window=12)
+```
+
+```{r}
+seasadj_clothing <- seasadj(stable_clothing_stl)
+autoplot(seasadj_clothing) + ggtitle("Seasonally Adjusted Monthly Clothing Sales") + ylab("Sales (in millions of dollars)") + xlab('Year')
+```
+```{r}
+lambda.opt <- BoxCox.lambda(furniture)
+stable_furniture <- BoxCox(furniture, lambda=lambda.opt)
+
+stable_furniture_stl <- stl(stable_furniture, s.window=12)
+
+autoplot(stable_furniture)
+lambda.opt
+```
+```{r}
+seasadj_furniture <- seasadj(stable_furniture_stl)
+autoplot(seasadj_furniture) + ggtitle("Seasonally Adjusted Monthly Furniture Sales") + ylab("Sales (in millions of dollars)") + xlab('Year')
+```
+
+
+```{r}
+lambda.opt <- BoxCox.lambda(alcohol)
+stable_alcohol <- BoxCox(alcohol, lambda=lambda.opt)
+
+stable_alcohol_stl <- stl(stable_alcohol, s.window=12)
+
+autoplot(stable_alcohol)
+lambda.opt
+```
+```{r}
+seasadj_alcohol <- seasadj(stable_alcohol_stl)
+autoplot(seasadj_alcohol) + ggtitle("Seasonally Adjusted Monthly Alcohol Sales") + ylab("Sales (in millions of dollars)") + xlab('Year')
+```
+```{r}
+lambda.opt <- BoxCox.lambda(sporting_goods)
+stable_sporting_goods <- BoxCox(sporting_goods, lambda=lambda.opt)
+lambda.opt
+stable_sporting_stl <- stl(stable_sporting_goods, s.window=12)
+```
+```{r}
+seasadj_sporting <- seasadj(stable_sporting_stl)
+autoplot(seasadj_sporting) + ggtitle("Seasonally Adjusted Monthly Sporting Goods Sales") + ylab("Sales (in millions of dollars)") + xlab('Year')
+```
+```{r}
+lambda.opt <- BoxCox.lambda(restaurant)
+lambda.opt
+stable_restaurants <- BoxCox(restaurant, lambda=lambda.opt)
+stable_restaurants_stl <- stl(stable_restaurants, s.window=12)
+
+autoplot(stable_)
+```
+```{r}
+seasadj_restaurants <- seasadj(stable_restaurants_stl)
+autoplot(seasadj_restaurants) + ggtitle("Seasonally Adjusted Monthly Restaurants Sales") + ylab("Sales (in millions of dollars)") + xlab('Year')
+```
+
+
+
+# Classic Linear Regression
+
+```{r}
+# combine the data
+df <- cbind(seasadj_clothing, seasadj_alcohol, seasadj_furniture, seasadj_restaurants, seasadj_sporting)
+head(df)
+```
+
+```{r}
+lm.obj <- lm(seasadj_clothing ~ ., data=df)
+summary(lm.obj)
+```
+```{r}
+vif(lm.obj)
+```
+Restaurants sales is the highest VIF, therefore we need to drop it
+
+```{r}
+lm.obj <- lm(seasadj_clothing ~ seasadj_alcohol + seasadj_furniture + seasadj_sporting, data=df)
+summary(lm.obj)
+```
+```{r}
+vif(lm.obj)
+```
+After dropping restaurants, we still need to drop sporting goods.
+
+```{r}
+lm.obj <- lm(seasadj_clothing ~ seasadj_alcohol + seasadj_furniture, data=df)
+summary(lm.obj)
+```
+```{r}
+vif(lm.obj)
+```
+Now VIF values look good.
+
+$$clothing_t = \beta_{0} + \beta_1 * alcohol_t  + \beta_2 * furniture_t + \epsilon_t $$
+$$ \epsilon_t \sim iid N(0,\sigma^2)$$
+
+```{r}
+# Residual diagnostics
+plot(lm.obj, which=1)
+plot(lm.obj, which=2)
+```
+```{r}
+df %>%
+  as.data.frame %>%
+  select(-seasadj_restaurants, -seasadj_sporting) %>%
+  GGally::ggpairs()
+```
+
+```{r}
+checkresiduals(lm.obj)
+```
+
+```{r}
+tsdisplay(resid(lm.obj))
+```
+ACF is clearly slowly decreasing while PACF shows 3 spikes and quick drop offs. This is a clear sign that we must difference our errors
+```{r}
+hand.picked <- Arima(df[,"seasadj_clothing"],
+                       xreg=df %>% as.data.frame %>% select(-seasadj_restaurants, -seasadj_sporting, -seasadj_clothing) %>%
+                         as.matrix, order=c(0,1,0))
+```
+
+
+```{r}
+checkresiduals(hand.picked)
+```
+
+```{r}
+tsdisplay(diff(resid(lm.obj)), lag.max = 48)
+```
+
+```{r}
+auto.fit <- auto.arima(df[,"seasadj_clothing"],
+                       xreg=df %>% as.data.frame %>% select(-seasadj_restaurants, -seasadj_sporting, -seasadj_clothing) %>%
+                         as.matrix)
+auto.fit
+```
+```{r}
+checkresiduals(auto.fit)
+```
+$$ clothing' =  \beta_1 * alcohol'_t + \beta_2 * furniture'_t $$
+$$\epsilon_t  \sim ARIMA(1,1,1)(0,0,2)[12] errors $$
+$$ \epsilon_t = \phi_1 \epsilon_{t-1} + \theta_1 \eta_{t-1} + \xi_{1} \eta_{t-12} + \xi_{2} \eta_{t-24} + \eta_t $$
+$$ \eta_t \sim iid N(0,\sigma^2)$$
+
+## Fitted equation:
+
+$$ \hat{clothing}' =  43.38 * alcohol'_t + 2.02 * furniture'_t + \epsilon_t$$
+$$\hat{\epsilon_t} =  $$
+
+```{r}
+coeftest(auto.fit)
+```
+
+```{r}
+confint(auto.fit)
+```
+
+# After 2008 recession
+```{r}
+post_2008 <- window(df,start=c(2010,1), end=c(2019,12))
+```
+
+```{r}
+autoplot(post_2008, facets = TRUE)
+```
+
+
+```{r}
+lm.obj <- lm(seasadj_clothing ~ ., data=post_2008)
+summary(lm.obj)
+```
+```{r}
+vif(lm.obj)
+```
+```{r}
+lm.obj <- lm(seasadj_clothing ~ seasadj_furniture + seasadj_restaurants + seasadj_sporting, data=post_2008)
+summary(lm.obj)
+```
+```{r}
+vif(lm.obj)
+```
+```{r}
+lm.obj <- lm(seasadj_clothing ~  seasadj_restaurants + seasadj_sporting, data=post_2008)
+summary(lm.obj)
+```
+```{r}
+vif(lm.obj)
+```
+
+```{r}
+checkresiduals(lm.obj)
+```
+```{r}
+plot(lm.obj, which=1)
+plot(lm.obj, which=2)
+```
+
+
+```{r}
+tsdisplay(diff(resid(lm.obj)), lag.max=48)
+```
+```{r}
+hand.picked <- Arima(post_2008[,"seasadj_clothing"],
+                       xreg=post_2008 %>% as.data.frame %>% select(seasadj_restaurants, seasadj_sporting) %>%
+                         as.matrix, order=c(0,1,0))
+
+hand.picked
+```
+
+
+```{r}
+auto.fit <- auto.arima(post_2008[,"seasadj_clothing"],
+                       xreg=post_2008 %>% as.data.frame %>% select(seasadj_restaurants, seasadj_sporting) %>%
+                         as.matrix)
+auto.fit
+```
+```{r}
+checkresiduals(auto.fit)
+```
+```{r}
+coeftest(auto.fit)
+```
+
+
+$$ clothing_t =  \beta_0 + \beta_1 * restaurants_t + \beta_2 * sporting_t + \epsilon_t$$
+
+$$\epsilon_t  \sim ARIMA(1,0,1) errors $$
+
+$$ \epsilon_t = \phi_1 \epsilon_{t-1} + \theta_1 \eta_{t-1} + \eta_t $$
+
+$$ \eta_t \sim iid N(0,\sigma^2)$$
+```{r}
+confint(auto.fit)
+```
+
